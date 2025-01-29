@@ -1,0 +1,26 @@
+version: "3.8"
+
+services:
+  database:
+    image: mariadb:10.8.3
+    command: --default-authentication-plugin=mysql_native_password
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: salonmakeservice
+    ports:
+      - 3306:3306
+
+  adminer:
+    image: adminer
+    restart: always
+    ports:
+      - 126:8080   
+    depends_on:
+      - database
+
+  mailer:
+    image: schickling/mailcatcher
+    ports:
+      - 1080:1080 
+      - 1025:1025  
