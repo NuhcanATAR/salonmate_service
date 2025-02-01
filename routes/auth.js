@@ -81,6 +81,92 @@ router.post('/login', async (req, res) => {
         res.status(500).json({ error: 'Giriş sırasında hata oluştu', details: err.message });
     }
 });
+
+router.post('/register-phone-send-code', async (req, res) => {
+    const { phone } = req.body;
+
+    try {
+        const [userRows] = await pool.query('SELECT id FROM users_detail WHERE phone = ?', [phone]);
+
+        if (userRows.length > 0) {
+            return res.status(404).json({ error: 'Bu telefon numarası zaten kayıtlı' });
+        }
+
+        const userId = userRows[0].id;
+        const generateResetCode = () => {
+            return Math.floor(100000 + Math.random() * 900000).toString(); 
+        };
+        const resetCode = generateResetCode();
+
+        const expiresAt = new Date(Date.now() + 10 * 60000);
+
+        const [result] = await pool.query(
+            'INSERT INTO register_phone_request (user_id, phone, code, expires_at) VALUES (?, ?, ?, ?)',
+            [userId, phone, resetCode, expiresAt]
+        );
+
+        if (result.affectedRows === 0) {
+            return res.status(500).json({ error: 'Telefon Numarası Doğrulama kaydedilemedi' });
+        }
+
+        await sendResetCodeSMS(phone, resetCode);
+
+        const userIp = req.ip || req.connection.remoteAddress;
+
+         const [sendCodeResult] = await pool.query(
+             'INSERT INTO send_code_logs (user_id, ip_address, send_time) VALUES (?, ?, ?)',
+             [userId, userIp, new Date()]
+         );
+ 
+         if (sendCodeResult.affectedRows === 0) {
+             console.error('Kod Gönderme Logu Kaydedilemedi');
+         }
+
+        res.status(200).json({ message: 'Doğrulama kodu SMS olarak gönderildi', resetCode });
+    } catch (err) {
+        console.error('Telefon Numarası Doğrulama talebi hatası:', err);
+        res.status(500).json({ error: 'Telefon Numarası Doğrulama talebi sırasında hata oluştu', details: err.message });
+    }
+});
+
+router.post('/register-verify-code', async (req, res) => {
+    const { phone, resetCode } = req.body;
+
+    try {
+        const formattedPhone = `+90${phone}`;
+
+        const verificationCheck = await client.verify.v2.services(process.env.TWILIO_VERIFY_SERVICE_SID)
+            .verificationChecks
+            .create({ to: formattedPhone, code: resetCode });
+
+        if (verificationCheck.status !== 'approved') {
+            return res.status(400).json({ error: 'Kod yanlış veya süresi dolmuş' });
+        }
+
+        const [userRows] = await pool.query('SELECT id FROM users_detail WHERE phone = ?', [phone]);
+
+        if (userRows.length === 0) {
+            return res.status(404).json({ error: 'Telefon numarası bulunamadı' });
+        }
+
+        const userIp = req.ip || req.connection.remoteAddress;
+
+         const [verifyResetResult] = await pool.query(
+             'INSERT INTO verify_reset_code_logs (user_id, ip_address, verify_time) VALUES (?, ?, ?)',
+             [userRows[0].id, userIp, new Date()]
+         );
+ 
+         if (verifyResetResult.affectedRows === 0) {
+             console.error('Kod Doğrulama Logu Kaydedilemedi');
+         }
+
+        res.status(200).json({ message: 'Kod doğrulandı', userId: userRows[0].id });
+
+    } catch (err) {
+        console.error('Kod doğrulama hatası:', err);
+        res.status(500).json({ error: 'Kod doğrulama sırasında hata oluştu', details: err.message });
+    }
+});
   
 // register endpoint
 router.post('/register', async (req, res) => {
