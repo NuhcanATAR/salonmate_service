@@ -86,46 +86,53 @@ router.post('/register-phone-send-code', async (req, res) => {
     const { phone } = req.body;
 
     try {
+        // Telefon numarasının daha önce kayıtlı olup olmadığını kontrol et
         const [userRows] = await pool.query('SELECT id FROM users_detail WHERE phone = ?', [phone]);
 
         if (userRows.length > 0) {
-            return res.status(404).json({ error: 'Bu telefon numarası zaten kayıtlı' });
+            return res.status(400).json({ error: 'Bu telefon numarası zaten kayıtlı' });
         }
 
-        const userId = userRows[0].id;
+        // Doğrulama kodu oluştur
         const generateResetCode = () => {
-            return Math.floor(100000 + Math.random() * 900000).toString(); 
+            return Math.floor(100000 + Math.random() * 900000).toString(); // 6 haneli rastgele kod
         };
         const resetCode = generateResetCode();
 
+        // Kodun geçerlilik süresi (10 dakika)
         const expiresAt = new Date(Date.now() + 10 * 60000);
 
+        // Telefon doğrulama isteğini kaydet (user_id NULL olarak ayarlandı)
         const [result] = await pool.query(
-            'INSERT INTO register_phone_request (user_id, phone, code, expires_at) VALUES (?, ?, ?, ?)',
-            [userId, phone, resetCode, expiresAt]
+            'INSERT INTO register_phone_request (phone, code, expires_at) VALUES (?, ?, ?)',
+            [phone, resetCode, expiresAt] // user_id NULL olarak ayarlandı
         );
 
         if (result.affectedRows === 0) {
-            return res.status(500).json({ error: 'Telefon Numarası Doğrulama kaydedilemedi' });
+            return res.status(500).json({ error: 'Telefon doğrulama isteği kaydedilemedi' });
         }
 
+        // SMS gönder
         await sendResetCodeSMS(phone, resetCode);
 
+        // Kullanıcının IP adresini al
         const userIp = req.ip || req.connection.remoteAddress;
 
-         const [sendCodeResult] = await pool.query(
-             'INSERT INTO send_code_logs (user_id, ip_address, send_time) VALUES (?, ?, ?)',
-             [userId, userIp, new Date()]
-         );
- 
-         if (sendCodeResult.affectedRows === 0) {
-             console.error('Kod Gönderme Logu Kaydedilemedi');
-         }
+        // Kod gönderme logunu kaydet
+        const [sendCodeResult] = await pool.query(
+            'INSERT INTO send_code_logs (phone, ip_address, send_time) VALUES (?, ?, ?)',
+            [phone, userIp, new Date()]
+        );
 
+        if (sendCodeResult.affectedRows === 0) {
+            console.error('Kod gönderme logu kaydedilemedi');
+        }
+
+        // Başarılı yanıt döndür
         res.status(200).json({ message: 'Doğrulama kodu SMS olarak gönderildi', resetCode });
     } catch (err) {
-        console.error('Telefon Numarası Doğrulama talebi hatası:', err);
-        res.status(500).json({ error: 'Telefon Numarası Doğrulama talebi sırasında hata oluştu', details: err.message });
+        console.error('Telefon doğrulama talebi hatası:', err);
+        res.status(500).json({ error: 'Telefon doğrulama talebi sırasında hata oluştu', details: err.message });
     }
 });
 
@@ -143,24 +150,18 @@ router.post('/register-verify-code', async (req, res) => {
             return res.status(400).json({ error: 'Kod yanlış veya süresi dolmuş' });
         }
 
-        const [userRows] = await pool.query('SELECT id FROM users_detail WHERE phone = ?', [phone]);
-
-        if (userRows.length === 0) {
-            return res.status(404).json({ error: 'Telefon numarası bulunamadı' });
-        }
-
         const userIp = req.ip || req.connection.remoteAddress;
 
          const [verifyResetResult] = await pool.query(
              'INSERT INTO verify_reset_code_logs (user_id, ip_address, verify_time) VALUES (?, ?, ?)',
-             [userRows[0].id, userIp, new Date()]
+             [null, userIp, new Date()]
          );
- 
+
          if (verifyResetResult.affectedRows === 0) {
              console.error('Kod Doğrulama Logu Kaydedilemedi');
          }
 
-        res.status(200).json({ message: 'Kod doğrulandı', userId: userRows[0].id });
+        res.status(200).json({ message: 'Kod doğrulandı' });
 
     } catch (err) {
         console.error('Kod doğrulama hatası:', err);
@@ -179,17 +180,17 @@ router.post('/register', async (req, res) => {
 
         const [existingUser] = await pool.query('SELECT id FROM users WHERE email = ?', [email]);
         if (existingUser.length > 0) {
-            return res.status(400).json({ error: 'Bu e-posta adresi zaten kayıtlı' });
+            return res.status(401).json({ error: 'Bu e-posta adresi zaten kayıtlı' });
         }
        
         const [existingUsername] = await pool.query('SELECT id FROM users WHERE username = ?', [username]);
         if (existingUsername.length > 0) {
-            return res.status(400).json({ error: 'Bu kullanıcı adı zaten alınmış' });
+            return res.status(402).json({ error: 'Bu kullanıcı adı zaten alınmış' });
         }
         
         const [existingPhone] = await pool.query('SELECT id FROM users_detail WHERE phone = ?', [phone]);
         if (existingPhone.length > 0) {
-            return res.status(400).json({ error: 'Bu telefon numarası zaten kayıtlı' });
+            return res.status(403).json({ error: 'Bu telefon numarası zaten kayıtlı' });
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
@@ -200,7 +201,7 @@ router.post('/register', async (req, res) => {
         );
 
         if (result.affectedRows === 0) {
-            return res.status(500).json({ error: 'Kullanıcı kaydedilemedi' });
+            return res.status(504).json({ error: 'Kullanıcı kaydedilemedi' });
         }
 
         const userId = result.insertId;
@@ -270,10 +271,10 @@ router.post('/request-reset-password', async (req, res) => {
 
         const userIp = req.ip || req.connection.remoteAddress;
 
-         const [sendCodeResult] = await pool.query(
-             'INSERT INTO send_code_logs (user_id, ip_address, send_time) VALUES (?, ?, ?)',
-             [userId, userIp, new Date()]
-         );
+        const [sendCodeResult] = await pool.query(
+            'INSERT INTO send_code_logs (user_id, ip_address, send_time, phone) VALUES (?, ?, ?, ?)',
+            [userId, userIp, new Date(), phone]
+        );
  
          if (sendCodeResult.affectedRows === 0) {
              console.error('Kod Gönderme Logu Kaydedilemedi');
