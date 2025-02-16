@@ -90,7 +90,7 @@ router.put("/account-update", async (req, res) => {
                     return res.status(404).json({ error: 'Kullanıcı detayları bulunamadı' });
                 }
 
-                return res.json({ message: 'Kullanıcı bilgileri başarıyla güncellendi' });
+                return res.status(200).json({ message: 'Kullanıcı bilgileri başarıyla güncellendi' });
             }catch (error){
                 return res.status(500).json({ error: 'Hata Oluştu!' });
             }
