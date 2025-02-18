@@ -7,11 +7,13 @@ const authRoutes = require('./routes/auth');
 const salonRoutes = require('./routes/salon');
 const salonCategory = require('./routes/service_category');
 const accountRoutes = require('./routes/account');
+const favoriteRoutes = require('./routes/favorite');
 
 app.use('/api', authRoutes); 
 app.use('/api', salonRoutes);
 app.use('/api', salonCategory);
 app.use('/api', accountRoutes);  
+app.use('/api', favoriteRoutes);  
 
 const PORT = 3000;
 app.listen(PORT, () => {
