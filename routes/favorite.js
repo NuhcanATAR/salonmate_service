@@ -76,7 +76,7 @@ router.post('/favorite-toggle', async (req, res) => {
                     } else {
                         const updateQuery = 'UPDATE favorite SET is_deleted = 0 WHERE user_id = ? AND salons_id = ?';
                         await pool.query(updateQuery, [userId, salonId]);
-                        return res.status(200).json({ message: 'Salon favorilere eklendi' });
+                        return res.status(201).json({ message: 'Salon favorilere eklendi' });
                     }
                 } else {
                     const insertQuery = 'INSERT INTO favorite (user_id, salons_id) VALUES (?, ?)';
