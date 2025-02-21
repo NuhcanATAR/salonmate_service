@@ -23,7 +23,6 @@ router.get('/appointments-date', async (req, res) => {
 
             const workHours = ["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00"];
             
-           
             const today = new Date();
             const availableDates = [];
 
@@ -72,10 +71,8 @@ router.get('/appointments-date', async (req, res) => {
 router.post("/appointment-create", async (req, res) => {
     try {
         const token = req.headers.authorization?.split(' ')[1]; 
-
        
         const { salonsId, servicesId, stylistId, appointmentDate, servicePrice, totalPrice, paymentType, addServices } = req.body;
-
         
         if (!token) {
             return res.status(401).json({ error: 'Token eksik' });
@@ -96,16 +93,14 @@ router.post("/appointment-create", async (req, res) => {
             try {
                 await connection.beginTransaction();
 
-               
                 const [appointmentResult] = await connection.query(
-                    `INSERT INTO appointments (user_id, salons_id, services_id, stylist_id, appointments_date, is_deleted, created_at) 
-                     VALUES (?, ?, ?, ?, ?, 0, NOW())`,
-                    [userId, salonsId, servicesId, stylistId, appointmentDate]
+                    `INSERT INTO appointments (user_id, salons_id, services_id, stylist_id, appointments_date, is_deleted, created_at, appointments_category_id) 
+                     VALUES (?, ?, ?, ?, ?, 0, NOW(), ?)`,
+                    [userId, salonsId, servicesId, stylistId, appointmentDate, 1] 
                 );
-
+                
                 
                 const appointmentId = appointmentResult.insertId;
-
                
                 await connection.query(
                     `INSERT INTO appointments_logs (user_id, ip_address, appointment_time, appointments_id) 
@@ -113,14 +108,12 @@ router.post("/appointment-create", async (req, res) => {
                     [userId, userIp, appointmentId]
                 );
 
-             
                 await connection.query(
                     `INSERT INTO appointments_detail (appointments_id, service_price, total_price, payment_type, created_at) 
                      VALUES (?, ?, ?, ?, NOW())`,
                     [appointmentId, servicePrice, totalPrice, paymentType ? 1 : 0] 
                 );
 
-                
                 if (Array.isArray(addServices) && addServices.length > 0) {
                     for (const service of addServices) {
                         const { name, price } = service;
@@ -146,6 +139,70 @@ router.post("/appointment-create", async (req, res) => {
         });
 
     } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+router.get('/appointment-user', async (req, res) => {
+    try{
+        const token = req.headers.authorization?.split(' ')[1];
+        if(!token ){
+            return res.status(401).json({ error: 'Token eksik.' });
+        }
+        jwt.verify(token, process.env.JWT_SECRET, async (err, decoded) => {
+            if (err) {
+                return res.status(403).json({ error: 'Geçersiz token' });
+            }
+            const userId = decoded.userId;
+            const connection = await pool.getConnection();
+
+            try {
+                const [appointments] = await connection.query(
+                    `SELECT a.*, 
+                            s.name AS salon_name, 
+                            sr.name AS service_name, 
+                            st.name AS stylist_name,
+                            ac.name AS appointment_category
+                    FROM appointments a
+                    LEFT JOIN salons s ON a.salons_id = s.id
+                    LEFT JOIN services sr ON a.services_id = sr.id
+                    LEFT JOIN stylist st ON a.stylist_id = st.id
+                    LEFT JOIN appointments_status_category ac ON a.appointments_category_id = ac.id
+                    WHERE a.user_id = ? AND a.is_deleted = 0
+                    ORDER BY a.created_at DESC`,
+                    [userId]
+                );
+                
+                if (appointments.length === 0) {
+                    return res.status(200).json({ appointments: [] });
+                }
+               
+                for (let appointment of appointments) {
+                    const [details] = await connection.query(
+                        `SELECT * FROM appointments_detail WHERE appointments_id = ?`,
+                        [appointment.id]
+                    );
+
+                    const [additionalServices] = await connection.query(
+                        `SELECT * FROM appointments_add_services WHERE appointments_id = ?`,
+                        [appointment.id]
+                    );
+
+                    appointment.details = details.length > 0 ? details[0] : null;
+                    appointment.additionalServices = additionalServices;
+                }
+
+                res.status(200).json({ appointments });
+            } catch (dbError) {
+                console.error("DB Error:", dbError);
+                res.status(500).json({ error: 'Veritabanı hatası' });
+            } finally {
+                connection.release();
+            }
+        });
+      
+    }catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server error' });
     }
