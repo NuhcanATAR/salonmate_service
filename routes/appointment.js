@@ -161,17 +161,34 @@ router.get('/appointment-user', async (req, res) => {
             try {
                 const [appointments] = await connection.query(
                     `SELECT a.*, 
+                            s.id AS salon_id,
+                            sen.file_name AS salon_file_name,
                             s.name AS salon_name, 
+                            sd.city AS salon_city,
+                            sd.district AS salon_district,
+                            sd.phone AS salon_phone,
+                            sren.file_name AS service_file_name,
+                            sr.name AS service_name,
+                            sr.description AS service_description,
+                            sr.duration AS service_duration,
+                            sd.email AS salon_email,
                             sr.name AS service_name, 
+                            sten.file_name AS stylist_file_name,
                             st.name AS stylist_name,
+                            st.phone as stylist_phone,
+                            st.email AS stylist_email,
                             ac.name AS appointment_category
                     FROM appointments a
                     LEFT JOIN salons s ON a.salons_id = s.id
+                    LEFT JOIN envoirments sen ON s.envoirment_id = sen.id
+                    LEFT JOIN salons_detail sd ON s.id = sd.salon_id
                     LEFT JOIN services sr ON a.services_id = sr.id
+                    LEFT JOIN envoirments sren ON sr.envoirment_id = sren.id
                     LEFT JOIN stylist st ON a.stylist_id = st.id
+                    LEFT JOIN envoirments sten ON st.envoirment_id = sten.id
                     LEFT JOIN appointments_status_category ac ON a.appointments_category_id = ac.id
                     WHERE a.user_id = ? AND a.is_deleted = 0
-                    ORDER BY a.created_at DESC`,
+                    ORDER BY a.created_at DESC`,    
                     [userId]
                 );
                 
