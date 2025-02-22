@@ -3,6 +3,7 @@ const pool = require('../db');
 const router = express.Router();
 require('dotenv').config();
 const jwt = require('jsonwebtoken');
+const axios = require('axios');
 
 router.get('/appointments-date', async (req, res) => {
     try{
@@ -208,5 +209,111 @@ router.get('/appointment-user', async (req, res) => {
     }
 });
 
+router.put('/appointment-update', async (req, res) => {
+    try {
+        const token = req.headers.authorization?.split(' ')[1];
+        const { appointmentId, status } = req.body;
+
+        if (!token) {
+            return res.status(401).json({ error: 'Token eksik.' });
+        }
+
+        jwt.verify(token, process.env.JWT_SECRET, async (err, decoded) => {
+            if (err) {
+                return res.status(403).json({ error: 'Geçersiz token' });
+            }
+
+            const userId = decoded.userId;
+            const connection = await pool.getConnection();
+
+            try {
+                const [updateResult] = await connection.query(
+                    `UPDATE appointments SET appointments_category_id = ? WHERE id = ? AND user_id = ?`,
+                    [status, appointmentId, userId]
+                );
+
+                if (updateResult.affectedRows === 0) {
+                    return res.status(404).json({ error: 'Randevu bulunamadı veya güncellenemedi.' });
+                }
+  
+                const [user] = await connection.query(
+                    `SELECT player_id FROM users WHERE id = ?`,
+                    [userId]
+                );
+
+                if (!user.length || !user[0].player_id) {
+                    return res.status(404).json({ error: 'Kullanıcı veya player_id bulunamadı.' });
+                }
+
+                const playerId = user[0].player_id;
+
+                let notificationMessages = {
+                    en: `Your appointment status has been updated: ${status}`,
+                    tr: `Randevunuzun durumu güncellendi: ${status}`
+                };
+                
+                if (status === 4) {
+                    notificationMessages = {
+                        en: "Your appointment has been canceled!",
+                        tr: "Randevunuz İptal Edildi!"
+                    };
+                } else if (status === 5) {
+                    notificationMessages = {
+                        en: "Your appointment has been rejected!",
+                        tr: "Randevunuz Reddedildi!"
+                    };
+                } else if (status === 1) {
+                    notificationMessages = {
+                        en: "Your appointment is pending approval!",
+                        tr: "Randevunuz Onayda Bekliyor!"
+                    };
+                } else if (status === 2) {
+                    notificationMessages = {
+                        en: "Your appointment has been approved!",
+                        tr: "Randevunuz Onaylandı!"
+                    };
+                } else if (status === 3) {
+                    notificationMessages = {
+                        en: "Your appointment has been updated!",
+                        tr: "Randevunuz Güncellendi!"
+                    };
+                }
+
+                const oneSignalResponse = await axios.post(
+                    'https://onesignal.com/api/v1/notifications',
+                    {
+                        app_id: process.env.ONESIGNAL_APP_ID,
+                        include_player_ids: [playerId],
+                        headings: {
+                            en: 'Appointment Updated',
+                            tr: 'Randevu Güncellendi'
+                        },
+                        contents: notificationMessages
+                    },
+                    {
+                        headers: {
+                            'Content-Type': 'application/json',
+                            Authorization: `Basic ${process.env.ONESIGNAL_REST_API_KEY}`
+                        }
+                    }
+                );
+
+                res.status(200).json({
+                    message: 'Randevu başarıyla güncellendi ve bildirim gönderildi.',
+                    notificationResponse: oneSignalResponse.data
+                });
+            } catch (dbError) {
+                console.error("DB Error:", dbError);
+                res.status(500).json({ error: 'Veritabanı hatası' });
+            } finally {
+                connection.release();
+            }
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
 
 module.exports = router;
