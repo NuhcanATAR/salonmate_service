@@ -365,6 +365,45 @@ router.post('/reset-password', async (req, res) => {
     }
 });
 
+
+router.put('/users-update-playerid', async (req, res) => {
+    try {
+        // Token'ı alıyoruz
+        const token = req.headers.authorization?.split(' ')[1];
+        const { playerId } = req.body;
+
+        if (!token || !playerId) {
+            return res.status(401).json({ error: 'Token eksik veya playerId belirtilmedi.' });
+        }
+
+        jwt.verify(token, process.env.JWT_SECRET, async (err, decoded) => {
+            if (err) {
+                return res.status(403).json({ error: 'Token geçersiz.' });
+            }
+            const userId = decoded.userId;
+            try {
+                const [updateUserPlayerId] = await pool.query(
+                    'UPDATE users SET player_id = ? WHERE id = ?',
+                    [playerId, userId] 
+                );
+
+                if (updateUserPlayerId.affectedRows === 0) {
+                    return res.status(404).json({ error: 'Kullanıcı bulunamadı' });
+                }
+
+                res.status(200).json({ message: 'Bildirim ID başarıyla güncellendi' });
+            } catch (dbError) {
+                console.error('Database Error:', dbError);
+                res.status(500).json({ error: 'Veritabanı hatası.' });
+            }
+        });
+    } catch (error) {
+        console.error('Server Error:', error);
+        res.status(500).json({ error: 'Sunucu hatası.' });
+    }
+});
+
+
 // JWT Token
 router.get('/protected', verifyToken, (req, res) => {
   res.json({ message: `Merhaba, ${req.user.email}. Bu korumalı bir rota!` });
