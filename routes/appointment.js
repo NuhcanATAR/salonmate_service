@@ -72,9 +72,9 @@ router.get('/appointments-date', async (req, res) => {
 router.post("/appointment-create", async (req, res) => {
     try {
         const token = req.headers.authorization?.split(' ')[1]; 
-       
+
         const { salonsId, servicesId, stylistId, appointmentDate, servicePrice, totalPrice, paymentType, addServices } = req.body;
-        
+
         if (!token) {
             return res.status(401).json({ error: 'Token eksik' });
         }
@@ -88,37 +88,49 @@ router.post("/appointment-create", async (req, res) => {
             }
 
             const userId = decoded.userId;
-            const userIp = req.ip; 
+            const userIp = req.ip;
 
             const connection = await pool.getConnection();
             try {
                 await connection.beginTransaction();
 
+                const [existingAppointments] = await connection.query(
+                    `SELECT id FROM appointments 
+                     WHERE stylist_id = ? 
+                     AND appointments_date = ? 
+                     AND is_deleted = 0`,
+                    [stylistId, appointmentDate]
+                );
+
+                if (existingAppointments.length > 0) {
+                    await connection.rollback();
+                    return res.status(409).json({ error: "Bu stilist için bu saat diliminde zaten bir randevu var." });
+                }
+ 
                 const [appointmentResult] = await connection.query(
                     `INSERT INTO appointments (user_id, salons_id, services_id, stylist_id, appointments_date, is_deleted, created_at, appointments_category_id) 
                      VALUES (?, ?, ?, ?, ?, 0, NOW(), ?)`,
-                    [userId, salonsId, servicesId, stylistId, appointmentDate, 1] 
+                    [userId, salonsId, servicesId, stylistId, appointmentDate, 1]
                 );
-                
-                
+
                 const appointmentId = appointmentResult.insertId;
-               
+
                 await connection.query(
                     `INSERT INTO appointments_logs (user_id, ip_address, appointment_time, appointments_id) 
                      VALUES (?, ?, NOW(), ?)`,
                     [userId, userIp, appointmentId]
                 );
-
+   
                 await connection.query(
                     `INSERT INTO appointments_detail (appointments_id, service_price, total_price, payment_type, created_at) 
                      VALUES (?, ?, ?, ?, NOW())`,
-                    [appointmentId, servicePrice, totalPrice, paymentType ? 1 : 0] 
+                    [appointmentId, servicePrice, totalPrice, paymentType ? 1 : 0]
                 );
 
                 if (Array.isArray(addServices) && addServices.length > 0) {
                     for (const service of addServices) {
                         const { name, price } = service;
-                        if (!name || !price) continue; 
+                        if (!name || !price) continue;
 
                         await connection.query(
                             `INSERT INTO appointments_add_services (appointments_id, name, price, created_at) 
@@ -146,11 +158,12 @@ router.post("/appointment-create", async (req, res) => {
 });
 
 router.get('/appointment-user', async (req, res) => {
-    try{
+    try {
         const token = req.headers.authorization?.split(' ')[1];
-        if(!token ){
+        if (!token) {
             return res.status(401).json({ error: 'Token eksik.' });
         }
+
         jwt.verify(token, process.env.JWT_SECRET, async (err, decoded) => {
             if (err) {
                 return res.status(403).json({ error: 'Geçersiz token' });
@@ -158,7 +171,16 @@ router.get('/appointment-user', async (req, res) => {
             const userId = decoded.userId;
             const connection = await pool.getConnection();
 
-            try {
+            try {                
+                const page = parseInt(req.query.page) || 1;  
+                const limit = parseInt(req.query.limit) || 10;
+                const offset = (page - 1) * limit; 
+
+                const [[{ totalCount }]] = await connection.query(
+                    `SELECT COUNT(*) AS totalCount FROM appointments WHERE user_id = ? AND is_deleted = 0`,
+                    [userId]
+                );
+
                 const [appointments] = await connection.query(
                     `SELECT a.*, 
                             s.id AS salon_id,
@@ -188,22 +210,26 @@ router.get('/appointment-user', async (req, res) => {
                     LEFT JOIN envoirments sten ON st.envoirment_id = sten.id
                     LEFT JOIN appointments_status_category ac ON a.appointments_category_id = ac.id
                     WHERE a.user_id = ? AND a.is_deleted = 0
-                    ORDER BY a.created_at DESC`,    
-                    [userId]
+                    ORDER BY 
+                        CASE WHEN ac.name = 'Güncellenen Randevu' THEN 0 ELSE 1 END, 
+                        a.created_at DESC
+                    LIMIT ? OFFSET ?`,    
+                    [userId, limit, offset]
                 );
-                
-                if (appointments.length === 0) {
-                    return res.status(200).json({ appointments: [] });
-                }
-               
+
                 for (let appointment of appointments) {
                     const [details] = await connection.query(
-                        `SELECT * FROM appointments_detail WHERE appointments_id = ?`,
+                        `SELECT ad.service_price AS service_price,
+                                ad.total_price AS total_price,
+                                ad.payment_type AS payment_type
+                        FROM appointments_detail ad WHERE appointments_id = ?`,
                         [appointment.id]
                     );
 
                     const [additionalServices] = await connection.query(
-                        `SELECT * FROM appointments_add_services WHERE appointments_id = ?`,
+                        `SELECT ads.name AS service_name,
+                        ads.price AS service_price
+                        FROM appointments_add_services ads WHERE appointments_id = ?`,
                         [appointment.id]
                     );
 
@@ -211,7 +237,14 @@ router.get('/appointment-user', async (req, res) => {
                     appointment.additionalServices = additionalServices;
                 }
 
-                res.status(200).json({ appointments });
+                res.status(200).json({ 
+                    total: totalCount,  
+                    page, 
+                    limit,  
+                    totalPages: Math.ceil(totalCount / limit),
+                    appointments 
+                });
+
             } catch (dbError) {
                 console.error("DB Error:", dbError);
                 res.status(500).json({ error: 'Veritabanı hatası' });
@@ -219,12 +252,13 @@ router.get('/appointment-user', async (req, res) => {
                 connection.release();
             }
         });
-      
-    }catch (error) {
+
+    } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server error' });
     }
 });
+
 
 router.put('/appointment-update', async (req, res) => {
     try {
@@ -293,6 +327,11 @@ router.put('/appointment-update', async (req, res) => {
                     notificationMessages = {
                         en: "Your appointment has been updated!",
                         tr: "Randevunuz Güncellendi!"
+                    };
+                }else if(status === 6){
+                    notificationMessages = {
+                        en: "Your appointment has been completed!",
+                        tr: "Randevunuz Tamamlandı!"
                     };
                 }
 
