@@ -48,6 +48,26 @@ router.get("/salons", async (req, res) => {
                 [city, district]
             );
 
+            for (let salon of salons) {
+                const salonId = salon.id;
+
+                const [evaluations] = await pool.query(
+                    `SELECT SUM(points) AS totalPoints, COUNT(*) AS totalEvaluations
+                     FROM evaluations WHERE salon_id = ?`,
+                    [salonId]
+                );
+                const totalPoints = evaluations[0]?.totalPoints || 0;
+                const totalEvaluations = evaluations[0]?.totalEvaluations || 1;
+                const averageScore = totalEvaluations > 0 ? (totalPoints / totalEvaluations).toFixed(1) : "0.0";
+                const [appointments] = await pool.query(
+                    `SELECT COUNT(*) AS totalAppointments FROM appointments WHERE salons_id = ?`,
+                    [salonId]
+                );
+                const totalAppointments = appointments[0]?.totalAppointments || 0;
+                salon.average_score = parseFloat(averageScore);
+                salon.total_appointments = totalAppointments;
+            }
+
             res.json({ salons });
         });
 
@@ -93,7 +113,28 @@ router.get('/salons-detail', async (req, res) => {
                 return res.status(404).json({ message: 'Salon bulunamadı' });
             }
 
-            res.status(200).json({ salon: salonDetail });
+            const [evaluations] = await pool.query(
+                `SELECT SUM(points) AS totalPoints, COUNT(*) AS totalEvaluations
+                 FROM evaluations WHERE salon_id = ?`, 
+                [salonId]
+            );
+            const totalPoints = evaluations[0].totalPoints || 0;
+            const totalEvaluations = evaluations[0].totalEvaluations || 1;      
+            const averageScore = totalEvaluations > 0 ? (totalPoints / totalEvaluations).toFixed(1) : "0.0";
+
+            const [appointments] = await pool.query(
+                `SELECT COUNT(*) AS totalAppointments FROM appointments WHERE salons_id = ?`, 
+                [salonId]
+            );
+            const totalAppointments = appointments[0].totalAppointments || 0;
+
+            const response = {
+                ...salonDetail[0],
+                average_score: parseFloat(averageScore),
+                total_appointments: totalAppointments
+            };
+
+            res.status(200).json({ salon: response });
         });
     } catch (error) {
         console.error(error);
