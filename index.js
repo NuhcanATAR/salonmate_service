@@ -10,6 +10,7 @@ const accountRoutes = require('./routes/account');
 const favoriteRoutes = require('./routes/favorite');
 const stylistRoutes = require('./routes/stylist');
 const appointmentsRoutes = require('./routes/appointment');
+const evaluationsRoutes = require('./routes/evaluation');
 
 app.use('/api', authRoutes); 
 app.use('/api', salonRoutes);
@@ -18,6 +19,7 @@ app.use('/api', accountRoutes);
 app.use('/api', favoriteRoutes);  
 app.use('/api', stylistRoutes);
 app.use('/api', appointmentsRoutes);
+app.use('/api', evaluationsRoutes);
 
 const PORT = 3000;
 app.listen(PORT, () => {
