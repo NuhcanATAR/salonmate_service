@@ -1,36 +1,51 @@
 const express = require('express');
 const pool = require('../db');
 const router = express.Router();
-require('dotenv').config(); 
+require('dotenv').config();
 require('dotenv').config();
 const jwt = require('jsonwebtoken');
 
 router.get("/categorys", async (req, res) => {
     try {
-        const token = req.headers.authorization?.split(' ')[1]; 
+        const token = req.headers.authorization?.split(' ')[1];
         if (!token) {
-            return res.status(401).json({ error: 'Yetkilendirme hatası, token eksik' });
+            return res.status(401).json({ error: "Yetkilendirme hatası, token eksik" });
         }
 
         jwt.verify(token, process.env.JWT_SECRET, async (err, decoded) => {
-            if(err){
-                return res.status(500).json({ error: 'Geçersiz token'});
+            if (err) {
+                return res.status(500).json({ error: "Geçersiz token" });
             }
+
+            const languageCode = req.headers.languagecode || 'tr';
+
+            const [languageResult] = await pool.query(
+                `SELECT id FROM languages WHERE short_name = ?`,
+                [languageCode]
+            );
+
+            if (languageResult.length === 0) {
+                return res.status(400).json({ error: "Geçersiz dil kodu" });
+            }
+            const languageId = languageResult[0].id;
 
             const [servicesCategories] = await pool.query(
                 `SELECT 
                     sc.id AS category_id,
-                    sc.name AS category_name,
+                    lw.value AS category_name,
                     e.file_name AS file_name  -- envoirments tablosundaki file_name
                 FROM services_category sc
-                LEFT JOIN envoirments e ON sc.envoirment_id = e.id  -- envoirments tablosu ile join
-                WHERE sc.is_deleted = 0`
+                LEFT JOIN language_word lw ON sc.ref_key = lw.top_key 
+                    AND lw.ref_language = ?
+                LEFT JOIN envoirments e ON sc.envoirment_id = e.id  
+                WHERE sc.is_deleted = 0`,
+                [languageId]
             );
-    
+
             if (servicesCategories.length === 0) {
                 return res.status(404).json({ message: "Hizmet kategorisi bulunamadı" });
             }
-    
+
             return res.status(200).json({
                 message: "Başarılı",
                 services_categories: servicesCategories
@@ -43,8 +58,6 @@ router.get("/categorys", async (req, res) => {
     }
 });
 
-
-
 router.get("/services-categorys", async (req, res) => {
     try {
         const token = req.headers.authorization?.split(' ')[1];
@@ -52,7 +65,7 @@ router.get("/services-categorys", async (req, res) => {
             return res.status(401).json({ error: 'Yetkilendirme hatası, token eksik' });
         }
 
-        const categoryId = req.headers['categoryid']; 
+        const categoryId = req.headers['categoryid'];
         if (!categoryId) {
             return res.status(400).json({ error: 'Category ID header eksik' });
         }
@@ -86,11 +99,11 @@ router.get("/services-categorys", async (req, res) => {
                 LEFT JOIN envoirments e ON s.envoirment_id = e.id  
                 WHERE s.service_category_id = ? 
                 AND s.is_deleted = 0 
-                AND (a.is_deleted = 0 OR a.is_deleted IS NULL)`, 
+                AND (a.is_deleted = 0 OR a.is_deleted IS NULL)`,
                 [categoryId]
             );
 
-          
+
             const result = {
                 "message": "Başarılı",
                 "services": []
@@ -98,7 +111,7 @@ router.get("/services-categorys", async (req, res) => {
 
             services.forEach(service => {
                 let existingService = result.services.find(s => s.id === service.service_id);
-    
+
                 if (!existingService) {
                     existingService = {
                         "id": service.service_id,
@@ -117,8 +130,8 @@ router.get("/services-categorys", async (req, res) => {
                     };
                     result.services.push(existingService);
                 }
-    
-                if (service.add_service_id) { 
+
+                if (service.add_service_id) {
                     existingService.add_services.push({
                         "id": service.add_service_id,
                         "services_id": service.services_id,

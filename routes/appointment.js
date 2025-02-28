@@ -6,24 +6,24 @@ const jwt = require('jsonwebtoken');
 const axios = require('axios');
 
 router.get('/appointments-date', async (req, res) => {
-    try{
+    try {
         const token = req.headers.authorization?.split(' ')[1];
         const stylistId = req.headers['stylistid'] || req.headers['stylist-id'];
-        
-        if(!token){
+
+        if (!token) {
             return res.status(401).json({ error: 'Token eksik ' });
         }
         if (!stylistId) {
             return res.status(401).json({ error: 'Stylist id yok.' });
         }
-      
+
         jwt.verify(token, process.env.JWT_SECRET, async (err, decoded) => {
             if (err) {
                 return res.status(403).json({ error: 'Geçersiz token' });
             }
 
             const workHours = ["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00"];
-            
+
             const today = new Date();
             const availableDates = [];
 
@@ -35,7 +35,7 @@ router.get('/appointments-date', async (req, res) => {
                 if (dayOfWeek === 0 || dayOfWeek === 6) continue; // skip weekends
 
                 let formattedDate = date.toISOString().split('T')[0]; // Get in YYYYY-MM-DD format
-                
+
                 try {
                     // pull full hours from database
                     const [bookedAppointments] = await pool.query(
@@ -63,7 +63,7 @@ router.get('/appointments-date', async (req, res) => {
 
             return res.json(availableDates);
         });
-    }catch(error){
+    } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server error' });
     }
@@ -71,7 +71,7 @@ router.get('/appointments-date', async (req, res) => {
 
 router.post("/appointment-create", async (req, res) => {
     try {
-        const token = req.headers.authorization?.split(' ')[1]; 
+        const token = req.headers.authorization?.split(' ')[1];
 
         const { salonsId, servicesId, stylistId, appointmentDate, servicePrice, totalPrice, paymentType, addServices } = req.body;
 
@@ -106,7 +106,7 @@ router.post("/appointment-create", async (req, res) => {
                     await connection.rollback();
                     return res.status(409).json({ error: "Bu stilist için bu saat diliminde zaten bir randevu var." });
                 }
- 
+
                 const [appointmentResult] = await connection.query(
                     `INSERT INTO appointments (user_id, salons_id, services_id, stylist_id, appointments_date, is_deleted, created_at, appointments_category_id) 
                      VALUES (?, ?, ?, ?, ?, 0, NOW(), ?)`,
@@ -120,7 +120,7 @@ router.post("/appointment-create", async (req, res) => {
                      VALUES (?, ?, NOW(), ?)`,
                     [userId, userIp, appointmentId]
                 );
-   
+
                 await connection.query(
                     `INSERT INTO appointments_detail (appointments_id, service_price, total_price, payment_type, created_at) 
                      VALUES (?, ?, ?, ?, NOW())`,
@@ -171,15 +171,26 @@ router.get('/appointment-user', async (req, res) => {
             const userId = decoded.userId;
             const connection = await pool.getConnection();
 
-            try {                
-                const page = parseInt(req.query.page) || 1;  
+            try {
+                const page = parseInt(req.query.page) || 1;
                 const limit = parseInt(req.query.limit) || 10;
-                const offset = (page - 1) * limit; 
+                const offset = (page - 1) * limit;
 
+                const languageCode = req.headers.languagecode || 'tr';
                 const [[{ totalCount }]] = await connection.query(
                     `SELECT COUNT(*) AS totalCount FROM appointments WHERE user_id = ? AND is_deleted = 0`,
                     [userId]
                 );
+
+                const [languageResult] = await connection.query(
+                    `SELECT id FROM languages WHERE short_name = ?`, [languageCode]
+                );
+
+                if (languageResult.length === 0) {
+                    return res.status(400).json({ error: 'Geçersiz dil kodu' });
+                }
+
+                const languageId = languageResult[0].id;
 
                 const [appointments] = await connection.query(
                     `SELECT a.*, 
@@ -194,12 +205,11 @@ router.get('/appointment-user', async (req, res) => {
                             sr.description AS service_description,
                             sr.duration AS service_duration,
                             sd.email AS salon_email,
-                            sr.name AS service_name, 
                             sten.file_name AS stylist_file_name,
                             st.name AS stylist_name,
-                            st.phone as stylist_phone,
+                            st.phone AS stylist_phone,
                             st.email AS stylist_email,
-                            ac.name AS appointment_category
+                            lw.value AS appointment_category
                     FROM appointments a
                     LEFT JOIN salons s ON a.salons_id = s.id
                     LEFT JOIN envoirments sen ON s.envoirment_id = sen.id
@@ -209,12 +219,15 @@ router.get('/appointment-user', async (req, res) => {
                     LEFT JOIN stylist st ON a.stylist_id = st.id
                     LEFT JOIN envoirments sten ON st.envoirment_id = sten.id
                     LEFT JOIN appointments_status_category ac ON a.appointments_category_id = ac.id
+                    LEFT JOIN language_word lw 
+                        ON ac.ref_key = lw.top_key 
+                        AND lw.ref_language = ?
                     WHERE a.user_id = ? AND a.is_deleted = 0
                     ORDER BY 
                         CASE WHEN ac.name = 'Güncellenen Randevu' THEN 0 ELSE 1 END, 
                         a.created_at DESC
-                    LIMIT ? OFFSET ?`,    
-                    [userId, limit, offset]
+                    LIMIT ? OFFSET ?`,
+                    [languageId, userId, limit, offset]
                 );
 
                 for (let appointment of appointments) {
@@ -237,12 +250,12 @@ router.get('/appointment-user', async (req, res) => {
                     appointment.additionalServices = additionalServices;
                 }
 
-                res.status(200).json({ 
-                    total: totalCount,  
-                    page, 
-                    limit,  
+                res.status(200).json({
+                    total: totalCount,
+                    page,
+                    limit,
                     totalPages: Math.ceil(totalCount / limit),
-                    appointments 
+                    appointments
                 });
 
             } catch (dbError) {
@@ -286,7 +299,7 @@ router.put('/appointment-update', async (req, res) => {
                 if (updateResult.affectedRows === 0) {
                     return res.status(404).json({ error: 'Randevu bulunamadı veya güncellenemedi.' });
                 }
-  
+
                 const [user] = await connection.query(
                     `SELECT player_id FROM users WHERE id = ?`,
                     [userId]
@@ -302,7 +315,7 @@ router.put('/appointment-update', async (req, res) => {
                     en: `Your appointment status has been updated: ${status}`,
                     tr: `Randevunuzun durumu güncellendi: ${status}`
                 };
-                
+
                 if (status === 4) {
                     notificationMessages = {
                         en: "Your appointment has been canceled!",
@@ -328,7 +341,7 @@ router.put('/appointment-update', async (req, res) => {
                         en: "Your appointment has been updated!",
                         tr: "Randevunuz Güncellendi!"
                     };
-                }else if(status === 6){
+                } else if (status === 6) {
                     notificationMessages = {
                         en: "Your appointment has been completed!",
                         tr: "Randevunuz Tamamlandı!"
