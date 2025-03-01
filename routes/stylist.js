@@ -4,6 +4,7 @@ const router = express.Router();
 require('dotenv').config();
 const jwt = require('jsonwebtoken');
 
+// stylist endpoint
 router.get('/stylist', async (req, res) => {
     try {
         const token = req.headers.authorization?.split(' ')[1];
@@ -57,6 +58,7 @@ router.get('/stylist', async (req, res) => {
     }
 });
 
+// stylist add services endpoint
 router.get('/stylist-add-services', async (req, res) => {
     try{
         const token = req.headers.authorization?.split(' ')[1];

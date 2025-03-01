@@ -5,63 +5,65 @@ require('dotenv').config();
 const jwt = require('jsonwebtoken');
 const axios = require('axios');
 
+// appointment date fetch endpoint
 router.get('/appointments-date', async (req, res) => {
     try {
         const token = req.headers.authorization?.split(' ')[1];
         const stylistId = req.headers['stylistid'] || req.headers['stylist-id'];
 
-        if (!token) {
-            return res.status(401).json({ error: 'Token eksik ' });
-        }
-        if (!stylistId) {
-            return res.status(401).json({ error: 'Stylist id yok.' });
-        }
+        if (!token) return res.status(401).json({ error: 'Token eksik' });
+        if (!stylistId) return res.status(401).json({ error: 'Stylist id yok.' });
 
         jwt.verify(token, process.env.JWT_SECRET, async (err, decoded) => {
-            if (err) {
-                return res.status(403).json({ error: 'Geçersiz token' });
-            }
+            if (err) return res.status(403).json({ error: 'Geçersiz token' });
 
             const workHours = ["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00"];
 
             const today = new Date();
-            const availableDates = [];
+            today.setDate(today.getDate() + 1);
 
-            for (let i = 0; i < 30; i++) {
-                let date = new Date();
-                date.setDate(today.getDate() + i);
+            const startDate = today.toISOString().split('T')[0];
+            const endDate = new Date(today);
+            endDate.setDate(today.getDate() + 30);
+            const endDateStr = endDate.toISOString().split('T')[0];
 
-                let dayOfWeek = date.getDay(); // 0: Sunday, 6: Saturday
-                if (dayOfWeek === 0 || dayOfWeek === 6) continue; // skip weekends
+            try {
+                const [appointments] = await pool.query(
+                    `SELECT 
+                        DATE_FORMAT(appointments_date, '%Y-%m-%d') AS appointment_date,
+                        JSON_ARRAYAGG(TIME_FORMAT(appointments_date, '%H:%i')) AS booked_times
+                    FROM appointments 
+                    WHERE stylist_id = ? 
+                    AND DATE(appointments_date) BETWEEN ? AND ?
+                    GROUP BY DATE(appointments_date)`,
+                    [stylistId, startDate, endDateStr]
+                );
 
-                let formattedDate = date.toISOString().split('T')[0]; // Get in YYYYY-MM-DD format
+                const bookedMap = {};
+                appointments.forEach(appt => {
+                    bookedMap[appt.appointment_date] = new Set(JSON.parse(appt.booked_times));
+                });
 
-                try {
-                    // pull full hours from database
-                    const [bookedAppointments] = await pool.query(
-                        `SELECT TIME_FORMAT(appointments_date, '%H:%i') AS booked_time 
-                         FROM appointments 
-                         WHERE stylist_id = ? AND DATE(appointments_date) = ?`,
-                        [stylistId, formattedDate]
-                    );
+                const availableDates = [];
+                for (let i = 0; i < 30; i++) {
+                    let date = new Date(today);
+                    date.setDate(today.getDate() + i);
+                    if (date.getDay() === 0) continue;
 
-                    // remove full hours from the list
-                    const bookedTimes = bookedAppointments.map(appt => appt.booked_time);
-                    const availableTimes = workHours.filter(hour => !bookedTimes.includes(hour));
+                    let formattedDate = date.toISOString().split('T')[0];
+                    const bookedTimes = bookedMap[formattedDate] || new Set();
 
+                    const availableTimes = workHours.filter(hour => !bookedTimes.has(hour));
                     if (availableTimes.length > 0) {
-                        availableDates.push({
-                            date: formattedDate,
-                            available_times: availableTimes
-                        });
+                        availableDates.push({ date: formattedDate, available_times: availableTimes });
                     }
-                } catch (dbError) {
-                    console.error("DB Error:", dbError);
-                    return res.status(500).json({ message: 'Veritabanı hatası' });
                 }
-            }
 
-            return res.json(availableDates);
+                return res.json(availableDates);
+            } catch (dbError) {
+                console.error("Error:", dbError);
+                return res.status(500).json({ message: 'Veritabanı hatası' });
+            }
         });
     } catch (error) {
         console.error(error);
@@ -69,6 +71,7 @@ router.get('/appointments-date', async (req, res) => {
     }
 });
 
+// appointment create endpoint
 router.post("/appointment-create", async (req, res) => {
     try {
         const token = req.headers.authorization?.split(' ')[1];
@@ -157,6 +160,7 @@ router.post("/appointment-create", async (req, res) => {
     }
 });
 
+// user appointment fetch endpoint
 router.get('/appointment-user', async (req, res) => {
     try {
         const token = req.headers.authorization?.split(' ')[1];
@@ -272,7 +276,7 @@ router.get('/appointment-user', async (req, res) => {
     }
 });
 
-
+// appointment status update endpoint
 router.put('/appointment-update', async (req, res) => {
     try {
         const token = req.headers.authorization?.split(' ')[1];

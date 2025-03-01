@@ -5,13 +5,13 @@ require('dotenv').config();
 require('dotenv').config();
 const jwt = require('jsonwebtoken');
 
+// user account get information endpoint
 router.get("/account", async (req, res) => {
     try {
         const token = req.headers.authorization?.split(' ')[1];
         if (!token) {
             return res.status(401).json({ error: 'Token eksik' });
         }
-
 
         jwt.verify(token, process.env.JWT_SECRET, async (err, decoded) => {
             if (err) {
@@ -59,6 +59,7 @@ router.get("/account", async (req, res) => {
     }
 });
 
+// user account update endpoint
 router.put("/account-update", async (req, res) => {
     try{
         const token = req.headers.authorization?.split(' ')[1];
@@ -101,6 +102,7 @@ router.put("/account-update", async (req, res) => {
     }
 });
 
+// user account city district update endpoint
 router.put("/account-city-district-update", async (req, res) => {
     try{
         const token = req.headers.authorization?.split(' ')[1];
