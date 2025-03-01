@@ -25,6 +25,7 @@ router.get('/appointments-date', async (req, res) => {
             const workHours = ["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00"];
 
             const today = new Date();
+            today.setDate(today.getDate() + 1);
             const availableDates = [];
 
             for (let i = 0; i < 30; i++) {
@@ -32,7 +33,7 @@ router.get('/appointments-date', async (req, res) => {
                 date.setDate(today.getDate() + i);
 
                 let dayOfWeek = date.getDay(); // 0: Sunday, 6: Saturday
-                if (dayOfWeek === 0 || dayOfWeek === 6) continue; // skip weekends
+                if (dayOfWeek === 0 || dayOfWeek === 7) continue; // skip weekends
 
                 let formattedDate = date.toISOString().split('T')[0]; // Get in YYYYY-MM-DD format
 

@@ -60,7 +60,7 @@ router.get("/salons", async (req, res) => {
                 const totalEvaluations = evaluations[0]?.totalEvaluations || 1;
                 const averageScore = totalEvaluations > 0 ? (totalPoints / totalEvaluations).toFixed(1) : "0.0";
                 const [appointments] = await pool.query(
-                    `SELECT COUNT(*) AS totalAppointments FROM appointments WHERE salons_id = ?`,
+                    `SELECT COUNT(*) AS totalAppointments FROM appointments WHERE salons_id = ? AND appointments_category_id = 7`,
                     [salonId]
                 );
                 const totalAppointments = appointments[0]?.totalAppointments || 0;
@@ -123,7 +123,7 @@ router.get('/salons-detail', async (req, res) => {
             const averageScore = totalEvaluations > 0 ? (totalPoints / totalEvaluations).toFixed(1) : "0.0";
 
             const [appointments] = await pool.query(
-                `SELECT COUNT(*) AS totalAppointments FROM appointments WHERE salons_id = ?`, 
+                `SELECT COUNT(*) AS totalAppointments FROM appointments WHERE salons_id = ? AND appointments_category_id = 7`, 
                 [salonId]
             );
             const totalAppointments = appointments[0].totalAppointments || 0;
