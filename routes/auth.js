@@ -5,7 +5,6 @@ const pool = require('../db');
 const router = express.Router();
 require('dotenv').config(); 
 require('dotenv').config();
-const crypto = require('crypto');
 
 const accountSid = process.env.TWILIO_ACCOUNT_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
@@ -31,7 +30,7 @@ const sendResetCodeSMS = async (phone, resetCode) => {
 };
 
 
-// login endpoint
+// sign in endpoint
 router.post('/login', async (req, res) => {
     const { email, username, password } = req.body;
 
@@ -82,6 +81,7 @@ router.post('/login', async (req, res) => {
     }
 });
 
+// sign up phone send code endpoint
 router.post('/register-phone-send-code', async (req, res) => {
     const { phone } = req.body;
 
@@ -128,6 +128,7 @@ router.post('/register-phone-send-code', async (req, res) => {
     }
 });
 
+// sign up verification code edpoint
 router.post('/register-verify-code', async (req, res) => {
     const { phone, resetCode } = req.body;
 
@@ -358,6 +359,7 @@ router.post('/reset-password', async (req, res) => {
 });
 
 
+// user update player id edpoint
 router.put('/users-update-playerid', async (req, res) => {
     try {
         const token = req.headers.authorization?.split(' ')[1];

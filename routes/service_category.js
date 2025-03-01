@@ -5,6 +5,7 @@ require('dotenv').config();
 require('dotenv').config();
 const jwt = require('jsonwebtoken');
 
+// category endpoint
 router.get("/categorys", async (req, res) => {
     try {
         const token = req.headers.authorization?.split(' ')[1];
@@ -58,6 +59,7 @@ router.get("/categorys", async (req, res) => {
     }
 });
 
+// service category endpoint
 router.get("/services-categorys", async (req, res) => {
     try {
         const token = req.headers.authorization?.split(' ')[1];
@@ -150,7 +152,5 @@ router.get("/services-categorys", async (req, res) => {
         res.status(500).json({ message: "Server Error" });
     }
 });
-
-
 
 module.exports = router;

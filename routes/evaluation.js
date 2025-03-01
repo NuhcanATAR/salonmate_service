@@ -4,6 +4,7 @@ const router = express.Router();
 require('dotenv').config();
 const jwt = require('jsonwebtoken');
 
+// appointment evulation create edpoint
 router.post('/evaluation-create', async (req, res) => {
     try {
         const token = req.headers.authorization?.split(' ')[1];
@@ -70,6 +71,7 @@ router.post('/evaluation-create', async (req, res) => {
     }
 });
 
+// appointment salon total appointment and point information edpoint
 router.get('/evaluation-salon-scores', async (req, res) => {
     try {
         const token = req.headers.authorization?.split(' ')[1];
@@ -96,7 +98,7 @@ router.get('/evaluation-salon-scores', async (req, res) => {
                 const averageScore = totalEvaluations > 0 ? (totalPoints / totalEvaluations).toFixed(1) : "0.0";
               
                 const [appointments] = await pool.query(
-                    `SELECT COUNT(*) AS totalAppointments FROM appointments WHERE salons_id = ?`, 
+                    `SELECT COUNT(*) AS totalAppointments FROM appointments WHERE salons_id = ? AND appointments_category_id = 7`, 
                     [salonId]
                 );
 

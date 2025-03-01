@@ -1,13 +1,12 @@
 const express = require('express');
-const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const pool = require('../db');
 const router = express.Router();
 require('dotenv').config();
 require('dotenv').config();
-const crypto = require('crypto');
 
 
+// salons endpoint
 router.get("/salons", async (req, res) => {
     try {
         const token = req.headers.authorization?.split(" ")[1];
@@ -77,6 +76,7 @@ router.get("/salons", async (req, res) => {
     }
 });
 
+// salon detail endpoint
 router.get('/salons-detail', async (req, res) => {
     try {
 
@@ -142,6 +142,7 @@ router.get('/salons-detail', async (req, res) => {
     }
 });
 
+// salon services endpoint
 router.get("/salon-services", async (req, res) => {
     try {
         const token = req.headers.authorization?.split(" ")[1];
@@ -238,7 +239,7 @@ router.get("/salon-services", async (req, res) => {
     }
 });
 
-
+// salon category services endpoint
 router.get("/salon-category-services", async (req, res) => {
     try {
         const token = req.headers.authorization?.split(" ")[1];
@@ -335,6 +336,5 @@ router.get("/salon-category-services", async (req, res) => {
         res.status(500).json({ message: "Server Error" });
     }
 });
-
 
 module.exports = router;

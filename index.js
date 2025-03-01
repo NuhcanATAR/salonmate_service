@@ -3,6 +3,7 @@ const app = express();
 app.use(express.json()); 
 const cors = require('cors');
 app.use(cors());
+
 const authRoutes = require('./routes/auth'); 
 const salonRoutes = require('./routes/salon');
 const salonCategory = require('./routes/service_category');

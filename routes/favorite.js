@@ -4,6 +4,7 @@ const router = express.Router();
 require('dotenv').config();
 const jwt = require('jsonwebtoken');
 
+// favorite salons endpoint
 router.get('/favorites', async (req, res) => {
     try {
         const token = req.headers.authorization?.split(' ')[1];
@@ -45,8 +46,7 @@ router.get('/favorites', async (req, res) => {
     }
 });
 
-module.exports = router;
-
+// favorite toggle endpoint
 router.post('/favorite-toggle', async (req, res) => {
     try {
         const token = req.headers.authorization?.split(' ')[1];
