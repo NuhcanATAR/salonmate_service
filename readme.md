@@ -17,7 +17,7 @@ git clone https://github.com/NuhcanATAR/salonmate_service.git
 
 <b>English Document (EN) : <a href="https://firebasestorage.googleapis.com/v0/b/caffely-90d9a.appspot.com/o/SalonMakeApp%2Fpdf%2Fabout_en.pdf?alt=media&token=03a2ac3a-7527-4321-8259-e4b791ba7b01">Görüntüle</a></b>
 
-<b>Turkish Document (EN) : <a href="https://firebasestorage.googleapis.com/v0/b/caffely-90d9a.appspot.com/o/SalonMakeApp%2Fpdf%2Fabout_tr.pdf?alt=media&token=add5e960-b5c4-4ab4-a827-0a48c7629bc0">Görüntüle</a></b>
+<b>Turkish Document (TR) : <a href="https://firebasestorage.googleapis.com/v0/b/caffely-90d9a.appspot.com/o/SalonMakeApp%2Fpdf%2Fabout_tr.pdf?alt=media&token=add5e960-b5c4-4ab4-a827-0a48c7629bc0">Görüntüle</a></b>
 
 ## Database Diagram
 
