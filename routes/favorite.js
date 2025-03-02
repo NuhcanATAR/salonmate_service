@@ -34,7 +34,32 @@ router.get('/favorites', async (req, res) => {
 
                 const [favorites] = await pool.query(query, [userId]);
 
+                for (let salon of favorites) {
+                    const salonId = salon.id;
+
+                    const [evaluations] = await pool.query(
+                        `SELECT SUM(points) AS totalPoints, COUNT(*) AS totalEvaluations
+                         FROM evaluations WHERE salon_id = ?`,
+                        [salonId]
+                    );
+
+                    const totalPoints = evaluations[0]?.totalPoints || 0;
+                    const totalEvaluations = evaluations[0]?.totalEvaluations || 1;
+                    const averageScore = totalEvaluations > 0 ? (totalPoints / totalEvaluations).toFixed(1) : "0.0";
+
+                    const [appointments] = await pool.query(
+                        `SELECT COUNT(*) AS totalAppointments FROM appointments WHERE salons_id = ? AND appointments_category_id = 7`,
+                        [salonId]
+                    );
+
+                    const totalAppointments = appointments[0]?.totalAppointments || 0;
+
+                    salon.average_score = parseFloat(averageScore);
+                    salon.total_appointments = totalAppointments;
+                }
+
                 res.status(200).json(favorites);
+
             } catch (dbError) {
                 console.error('Veritabanı hatası:', dbError);
                 res.status(500).json({ message: 'Veritabanı hatası' });

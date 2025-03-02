@@ -228,7 +228,7 @@ router.get('/appointment-user', async (req, res) => {
                         AND lw.ref_language = ?
                     WHERE a.user_id = ? AND a.is_deleted = 0
                     ORDER BY 
-                        CASE WHEN ac.name = 'Güncellenen Randevu' THEN 0 ELSE 1 END, 
+                        CASE WHEN ac.id = 3 THEN 0 ELSE 1 END, 
                         a.created_at DESC
                     LIMIT ? OFFSET ?`,
                     [languageId, userId, limit, offset]
