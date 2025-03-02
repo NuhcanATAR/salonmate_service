@@ -174,8 +174,8 @@ router.get("/salon-services", async (req, res) => {
                     s.is_active,
                     s.created_at,
                     s.is_deleted AS service_is_deleted,
-                    s.envoirment_id,  -- doğru yazım burada envoirment_id olmalı
-                    e.file_name AS envoirment_file_name,  -- envoirment tablosundaki file_name
+                    s.envoirment_id,  
+                    e.file_name AS envoirment_file_name,  
                     a.id AS add_service_id,
                     a.services_id,
                     a.name AS add_service_name,
@@ -183,7 +183,7 @@ router.get("/salon-services", async (req, res) => {
                     a.is_deleted AS add_service_is_deleted
                 FROM services s
                 LEFT JOIN add_services a ON s.id = a.services_id
-                LEFT JOIN envoirments e ON s.envoirment_id = e.id  -- envoirments tablosu ile ilişki
+                LEFT JOIN envoirments e ON s.envoirment_id = e.id 
                 WHERE s.salon_id = ? 
                 AND s.is_deleted = 0 
                 AND a.is_deleted = 0`,
@@ -271,8 +271,8 @@ router.get("/salon-category-services", async (req, res) => {
                     s.is_active,
                     s.created_at,
                     s.is_deleted AS service_is_deleted,
-                    s.envoirment_id,  -- doğru yazım burada envoirment_id olmalı
-                    e.file_name AS envoirment_file_name,  -- envoirment tablosundaki file_name
+                    s.envoirment_id,  
+                    e.file_name AS envoirment_file_name,  
                     a.id AS add_service_id,
                     a.services_id,
                     a.name AS add_service_name,
@@ -280,7 +280,7 @@ router.get("/salon-category-services", async (req, res) => {
                     a.is_deleted AS add_service_is_deleted
                 FROM services s
                 LEFT JOIN add_services a ON s.id = a.services_id
-                LEFT JOIN envoirments e ON s.envoirment_id = e.id  -- envoirments tablosu ile ilişki
+                LEFT JOIN envoirments e ON s.envoirment_id = e.id  
                 WHERE s.salon_id = ? 
                 AND s.service_category_id = ? 
                 AND s.is_deleted = 0 
